@@ -12,6 +12,11 @@ gwtVersion := "2.4.0"
 
 resolvers ++= Seq(
 	  "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
+	  "repo.codahale.com" at "http://repo.codahale.com",
+	  "bigdata.releases" at "http://www.systap.com/maven/releases",
+	  "bigdata.snapshots" at "http://www.systap.com/maven/snapshots",
+	  "nxparser-repo" at "http://nxparser.googlecode.com/svn/repository",
+	  "openrdf.releases" at "http://repo.aduna-software.org/maven2/releases",
 	  "Vaadin add-ons repository" at "http://maven.vaadin.com/vaadin-addons"
 )
 
@@ -39,3 +44,5 @@ javaOptions in Gwt += "-mx1024M"
 
 // more correct place would be to compile widgetset under the target dir and configure jetty to find it from there 
 gwtTemporaryPath := file(".") / "src" / "main" / "webapp" / "VAADIN" / "widgetsets"
+
+port in container.Configuration := 8282
