@@ -21,6 +21,7 @@ class RDFEditApplication extends Application {
       add( new DocumentComponent(
 	new URIImpl("http://purl.uniprot.org/locations/9919"),
 	rest))
+      add(new UploadComponent(rest))
     }
 
     getMainWindow.addComponent(new VerticalLayout(width = 100 percent, height = 100 percent) {

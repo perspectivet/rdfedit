@@ -8,6 +8,7 @@ import com.vaadin.data.util.IndexedContainer
 import com.vaadin.data.Item
 import com.vaadin.ui.{CustomComponent,Layout,GridLayout,ComboBox,Component}
 import com.vaadin.ui.themes.BaseTheme
+import com.vaadin.terminal.Sizeable
 
 import org.openrdf.model.{Value,Resource,URI}
 import org.openrdf.query.BindingSet
@@ -175,11 +176,16 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent {
       new Label("No properties")
     }
 
-
-  val panel = new Panel(caption = "Document") {
-    add(new Label(doc.subject.stringValue))
-    add(properties)
-  }
+    val hl = new HorizontalLayout() {
+      val subject = add(new TextField(""))
+      subject.setValue(doc.subject.stringValue)
+      subject.setWidth(doc.subject.stringValue.length, Sizeable.UNITS_EM)
+      add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
+    }
+    val panel = new Panel(caption = "Document") {
+      add(hl)
+      add(properties)
+    }
 
     panel
   }
