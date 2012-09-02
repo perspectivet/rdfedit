@@ -31,8 +31,10 @@ class UploadComponent(val rest:Rest) extends CustomComponent {
       val rdf = add(new TextArea("RDF (N3 only for now)"))
       rdf.setSizeFull
       rdf.setInputPrompt("Enter some RDF to add to the db")
-      add(new Button("Upload", action = _ => upload(rdf,log)))
-      add(new Button("Clear", action = _ => clear(rdf)))
+      add(new HorizontalLayout() {
+	add(new Button("Upload", action = _ => upload(rdf,log)))
+	add(new Button("Clear", action = _ => clear(rdf)))
+      })
       val log = add(new TextArea("Response Log"))
       log.setSizeFull
       log.setReadOnly(true)
@@ -41,7 +43,9 @@ class UploadComponent(val rest:Rest) extends CustomComponent {
 
   def upload(rdf:TextArea,log:TextArea) = {
     val mutationCount = rest.putN3String(rdf.getValue.toString)
+    log.setReadOnly(false)
     log.setValue(log.getValue + ("\nmodified %s records" format mutationCount))
+    log.setReadOnly(true)
   }
 
   def clear(rdf:TextArea) = {

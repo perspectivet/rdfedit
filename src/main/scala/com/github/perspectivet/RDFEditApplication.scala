@@ -13,22 +13,21 @@ class RDFEditApplication extends Application {
   val rest = new Rest(sparqlUrl)
 
   def init {
-    val layout = new VerticalLayout
-    setMainWindow(new Window("rdfedit", content = layout))
+    val layout = new VerticalLayout(margin = true, spacing = true)
+    layout.setSizeFull
+    setMainWindow(new Window("rdfworkbench", content = layout))
     
-    val panel = new Panel(caption = "RDF Editor") {
-      //add(new Button(caption = "Button that does nothing"))
-      add( new DocumentComponent(
-	new URIImpl("http://purl.uniprot.org/locations/9919"),
-	rest))
-      add(new UploadComponent(rest))
+    val tabs = new TabSheet(caption = "RDF Workbench",width = 100 percent, height = 100 percent) {
+      addTab(new SparqlComponent(rest),"Query")
+      addTab(
+	new DocumentComponent(
+	  new URIImpl("http://purl.uniprot.org/locations/9919"),
+	  rest),
+	"Document View")
+      addTab(new UploadComponent(rest),"RDF Data Upload")
     }
 
-    getMainWindow.addComponent(new VerticalLayout(width = 100 percent, height = 100 percent) {
-      add(panel)
-      //add(new Button(caption = "Button that does nothing"))
-    })
+    getMainWindow.addComponent(tabs)
 
-    layout.setSizeFull
   }
 }

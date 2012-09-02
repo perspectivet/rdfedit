@@ -22,6 +22,7 @@ import scala.collection.JavaConverters._
 
 import vaadin.scala._
 
+//class Document
 /*
 class DocumentActionHandler(val table:Table) extends Action.Handler {
   val ACTION_NEW = new Action("New")
@@ -52,7 +53,8 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
 object ResUtils {
   val convertible = Map(
     "http://www.w3.org/1999/02/22-rdf-syntax-ns" -> "rdf",
-    "http://www.w3.org/2000/01/rdf-schema" -> "rdfs"
+    "http://www.w3.org/2000/01/rdf-schema" -> "rdfs",
+    "http://bbp.epfl.ch/ontology/morphology" -> "mt"
     //"http://purl.uniprot.org/core/" -> "uniprot-core"
   )
   
@@ -109,6 +111,30 @@ object DocUtils {
       }
     }
 
+    label
+  }
+
+  def getComponent(v:Value):Component = {
+    val label = v match {
+      case u:URI => {
+	println("uri : " + v.stringValue)
+	val button = new Button(ResUtils.shorten(u))
+	button.setStyleName(BaseTheme.BUTTON_LINK)
+	button
+      }
+      case r:Resource => {
+	println("resource : " + v.stringValue)
+	new Label(ResUtils.shorten(r))
+      }
+      case _v:Value => {
+	println("value : " + v.stringValue)
+	new Label(ResUtils.shorten(_v))
+      }
+      case _ => {
+	println("Any : "+v.toString)
+	new Label(v.toString)
+      }
+    }
     label
   }
 
@@ -177,10 +203,13 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent {
     }
 
     val hl = new HorizontalLayout() {
-      val subject = add(new TextField(""))
+      val subject = add(new TextField("") {
+      })
+
+      //subject.addListener(event:Property.ValueChangeEvent => setSubjectPanel(this.getValue.toString) )
       subject.setValue(doc.subject.stringValue)
       subject.setWidth(doc.subject.stringValue.length, Sizeable.UNITS_EM)
-      add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
+      val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
     }
     val panel = new Panel(caption = "Document") {
       add(hl)
