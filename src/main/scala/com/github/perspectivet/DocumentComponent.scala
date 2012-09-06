@@ -91,9 +91,9 @@ object DocUtils {
     val label = v match {
       case u:URI => {
 	println("uri : " + v.stringValue)
-	//new Label(ResUtils.shorten(u))
 	val button = new Button(ResUtils.shorten(u), 
-		   action = _ => parent.setSubjectPanel(u))
+				action = _ => parent.setSubjectPanel(u))
+	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
 	button
       }
@@ -119,6 +119,7 @@ object DocUtils {
       case u:URI => {
 	println("uri : " + v.stringValue)
 	val button = new Button(ResUtils.shorten(u))
+	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
 	button
       }
@@ -144,6 +145,7 @@ object DocUtils {
 	println("uri : " + v.stringValue)
 	val button = new Button(ResUtils.shorten(u), 
 		   action = _ => parent.setSubjectPanel(u))
+	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
 	button
       }
