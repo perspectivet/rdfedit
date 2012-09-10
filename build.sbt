@@ -25,12 +25,13 @@ libraryDependencies ++= Seq(
   "com.vaadin" % "vaadin" % "6.7.6",
   "org.vaadin.addons" % "scaladin" % "1.0.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.0.4.v20111024" % "container",
-  "com.github.perspectivet" %% "bigdata-rest-scala" % "0.0.1-SNAPSHOT"
+  "com.github.perspectivet" %% "bigdata-rest-scala" % "0.0.1-SNAPSHOT",
+  "commons-collections" % "commons-collections" % "3.2.1"
 )
 
+//other add-ons
 libraryDependencies ++= Seq(
-	//Add add-ons from the directory here. e.g.
-	//"org.vaadin.addons" % "ratingstars" % "1.4"
+//	"org.vaadin.addons" % "contextmenu" % "3.1.0"
 )
 
 

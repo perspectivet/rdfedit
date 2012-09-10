@@ -1,12 +1,15 @@
 package com.github.perspectivet
 
 import com.github.perspectivet.bigdata.rest.{Rest,Document}
+import com.github.perspectivet.JavaUtils._
 
 import com.vaadin.event.Action
 import com.vaadin.event.Action._
 import com.vaadin.data.util.IndexedContainer
-import com.vaadin.data.Item
-import com.vaadin.ui.{CustomComponent,Layout,GridLayout,ComboBox,Component}
+import com.vaadin.data.{Item,Container}
+import com.vaadin.ui.{ Button => VButton, TextField }
+import com.vaadin.ui.{ CustomComponent,Layout,GridLayout,ComboBox,Component}
+import com.vaadin.ui.AbstractSelect._
 import com.vaadin.ui.themes.BaseTheme
 import com.vaadin.terminal.Sizeable
 
@@ -15,15 +18,14 @@ import org.openrdf.query.BindingSet
 import org.openrdf.query.TupleQueryResult
 import org.openrdf.model.impl.URIImpl
 
-
-import java.util.{LinkedList => JLinkedList}
+import java.util.{LinkedList => JLinkedList,Collection => JCollection}
 import scala.collection.immutable.Map
 import scala.collection.JavaConverters._
-
 import vaadin.scala._
 
 //class Document
-/*
+
+
 class DocumentActionHandler(val table:Table) extends Action.Handler {
   val ACTION_NEW = new Action("New")
   val ACTION_DELETE = new Action("Delete")
@@ -48,7 +50,7 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
     } 
   }
 }
-*/
+
 
 object ResUtils {
   val convertible = Map(
@@ -114,6 +116,44 @@ object DocUtils {
     label
   }
 
+    def getEditableComponent(v:Value, comboValues:JCollection[Value]):Component = {
+    val label = v match {
+      case u:URI => {
+	println("uri : " + v.stringValue)
+	val value = ResUtils.shorten(u)
+	val comboBox = new ComboBox
+	jforeach[Value](comboValues,c => 
+	  comboBox.addItem(ResUtils.shorten(c)))
+	comboBox.setValue(value)
+	comboBox.setTextInputAllowed(true)
+	comboBox.setFilteringMode(Filtering.FILTERINGMODE_CONTAINS)
+	comboBox.setNewItemsAllowed(true)
+	//comboBox.setContainerDataSource(comboValues)
+	comboBox
+      }
+      case r:Resource => {
+	println("resource : " + v.stringValue)
+	val te = new TextField
+	te.setValue(ResUtils.shorten(r))
+	te
+      }
+      case _v:Value => {
+	println("value : " + v.stringValue)
+	val te = new TextField
+	te.setValue(ResUtils.shorten(_v))
+	te
+      }
+      case _ => {
+	println("Any : "+v.toString)
+	val te = new TextField
+	te.setValue(v.toString)
+	te
+      }
+    }
+
+    label
+  }
+
   def getComponent(v:Value):Component = {
     val label = v match {
       case u:URI => {
@@ -167,65 +207,159 @@ object DocUtils {
     label
   }
 }
-class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent {
-//class DocumentComponent(val doc:Document, val rest:Rest) extends CustomComponent {
+/*
+class TQREditableGenerator(val clickListener:VButton.ClickListener,optionList:JCollection[Value]) extends VTable.ColumnGenerator {
 
-  setCompositionRoot(getSubjectPanel(s))
+  override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
+    val item = source.getItem(itemId)
+    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
+    val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
+    
+    val component = 
+      if(colVal != null) {
+	val c = DocUtils.getComponent(colVal)
+	c match {
+	  case b:Button => b.addListener(clickListener)
+	  case _ => Unit
+	}
+	c
+      } else {
+	new Label("null")
+      }
+
+    component
+  }
+}
+*/
+
+class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with VButton.ClickListener {
+//class DocumentComponent(val doc:Document, val rest:Rest) extends CustomComponent {
+  val document = this
+  //setCompositionRoot(getSubjectPanel(s))
+  setCompositionRoot(getSubjectTable(s))
+
+  override def buttonClick(event:VButton#ClickEvent) {
+    event.getSource match {
+      case b:Button => 
+	b.getData match {
+	  case u:URI =>
+	    println("clicked button with value(%s)" format u.stringValue)
+	  //switchToDocument(u,tabs,doc)
+	  case _ =>
+	    println("clicked a non-URI button")
+	}
+      case _ =>
+	println("clicked a non button")
+    }
+  }
   
   def getSubjectPanel(subject:URI):Panel = {
-  val doc = rest.getSubjectDocument(subject,List())
+    val doc = rest.getSubjectDocument(subject,List())
 
-  val predResults = rest.sparql("SELECT distinct ?p WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
-  val predTypes = rest.bindingToCollection("p",predResults).asJavaCollection
+    val predResults = rest.sparql("SELECT distinct ?p WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
+    //val predTypes = rest.bindingToCollection("p",predResults).asJavaCollection
+    val predTypes = new TQRContainer(predResults)
 
-  val objResults = rest.sparql("SELECT distinct ?o WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
-  val objTypes = rest.bindingToCollection("o",objResults).asJavaCollection
+    val objResults = rest.sparql("SELECT distinct ?o WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
+    //val objTypes = rest.bindingToCollection("o",objResults).asJavaCollection
+    val objTypes = new TQRContainer(objResults)
 
   var i = 0
   val ilen = doc.properties.size
-  val properties = 
+  val propertyGrid = 
     if(ilen > 0) {
       val propIt = doc.properties.iterator
-      val grid = new GridLayout(3,ilen)
+      val grid = new GridLayout(4,ilen)
       grid.setSpacing(true)
       while(i < ilen) {
 	val po = propIt.next
 	val pred = DocUtils.getPredicateComponent(po.pred,this)
 	val obj = DocUtils.getSubjectComponent(po.obj,this)
+	val edit = new Button("Edit"/*, action = _ => editProperty(i,grid)*/)
+	edit.setStyleName("small")
 	val delete = new Button("-", action = _ => deleteProperty(i,grid))
 	delete.setStyleName("small")
-	grid.addComponent(delete,0,i)
+	grid.addComponent(edit,0,i)
 	grid.addComponent(pred,1,i)
 	grid.addComponent(obj,2,i)
+	grid.addComponent(delete,3,i)
 	i=i+1
       }
       grid
     } else {
-      new Label("No properties")
+      new GridLayout()
     }
 
     val hl = new HorizontalLayout() {
-      val subject = add(new TextField("") {
-      })
-
-      //subject.addListener(event:Property.ValueChangeEvent => setSubjectPanel(this.getValue.toString) )
+      val subject = add(new TextField)
       subject.setValue(doc.subject.stringValue)
       subject.setWidth(doc.subject.stringValue.length, Sizeable.UNITS_EM)
       val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
     }
     val panel = new Panel(caption = "Document") {
       add(hl)
-      add(properties)
+      add(propertyGrid)
+      add(new Button("Add property"/*,action = _ => addProperty(propertyGrid)*/))
     }
 
     panel
   }
 
-  def deleteProperty(index:Int,layout:Layout) = {
+  def getSubjectTable(subject:URI):Panel = {
+    val doc = rest.getSubjectDocument(subject,List())
+    val predResults = rest.sparql("SELECT distinct ?p WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
+    val predTypes = rest.bindingToCollection("p",predResults).asJavaCollection
+    val pColGen = new TQREditableColumnGenerator(predTypes,document)
+
+    val objResults = rest.sparql("SELECT distinct ?o WHERE { <%s> ?p ?o }" format doc.subject.stringValue)
+    val objTypes = rest.bindingToCollection("o",objResults).asJavaCollection
+    val oColGen = new TQREditableColumnGenerator(objTypes,document)
+
+    val genMap = Map("Property" -> pColGen, "Value" -> oColGen)
+    val query = "SELECT ?Property ?Value WHERE { <%s> ?Property ?Value }" format doc.subject.stringValue
+
+    val propTable = new TQRTable(genMap,rest,query)
+    propTable.addActionHandler(new DocumentActionHandler(propTable))
+
+    val hl = new HorizontalLayout() {
+      val subject = add(new TextField)
+      subject.setValue(doc.subject.stringValue)
+      subject.setWidth(doc.subject.stringValue.length, Sizeable.UNITS_EM)
+      val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
+    }
+    val panel = new Panel(caption = "Document") {
+      add(hl)
+      add(propTable)
+      add(new Button("Edit",
+		     action = _ => {
+		       propTable.setEditable(!propTable.isEditable())
+		       this.setCaption((if(propTable.isEditable()) "Save" else "Edit"))
+		     }))
+    }
+
+    panel
+  }
+
+  def addProperty(panel:Panel) = {
+    println("adding property")
+  }
+
+  def editProperty(panel:Panel) = {
+    println("editing...")
     
   }
 
-  def setSubjectPanel(subject:URI) = {
-    setCompositionRoot(getSubjectPanel(subject))
+  def deleteProperty(index:Int,layout:Layout) = {
+    println("deleting property:" + index.toString)
   }
+
+  def setSubjectPanel(subject:URI) = {
+    setCompositionRoot(getSubjectTable(subject))
+  }
+  
+/*
+  def reload(event:ContextMenu.ClickEvent) = {
+    println("reloading")
+  }
+*/
 }

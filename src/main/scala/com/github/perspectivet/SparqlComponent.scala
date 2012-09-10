@@ -5,7 +5,7 @@ import com.github.perspectivet.bigdata.rest.{Rest,Document}
 import com.vaadin.event.Action
 import com.vaadin.event.Action._
 import com.vaadin.data.util.IndexedContainer
-import com.vaadin.data.Item
+import com.vaadin.data.{Item,Container}
 import com.vaadin.terminal.ExternalResource
 import com.vaadin.ui.{CustomComponent,Layout,GridLayout,ComboBox,Component,TextArea}
 import com.vaadin.ui.{Button => VButton}
@@ -20,7 +20,7 @@ import org.openrdf.query.TupleQueryResult
 import org.openrdf.model.impl.URIImpl
 
 
-import java.util.{LinkedList => JLinkedList,List => JList}
+import java.util.{LinkedList => JLinkedList,List => JList,Collection => JCollection}
 import scala.collection.immutable.Map
 import scala.collection._
 import scala.collection.JavaConverters._
@@ -63,22 +63,9 @@ object TQRContainer {
       table.addGeneratedColumn(bName, new TQRColumnGenerator(clickListener))
     }
   }
-/*
-  def removeGeneratedColumns(bindings:JList[String],table:VTable) {
-    var bNameIt = bindings.iterator
-    while(bNameIt.hasNext) {
-      val bName = bNameIt.next
-      println("remove generated column(%s)" format bName)
-      table.removeGeneratedColumn(table.getColumnGenerator(bName))
-    }
-  }
-*/
 }
 
 class TQRContainer(results:TupleQueryResult) extends IndexedContainer {
-  //val PREDICATE_ID = "Id"
-  //val TYPE_NAME = "Type"
-  //val VALUE_NAME = "Value"
   var bindings:JList[String] = null
 
   init(results)
@@ -87,7 +74,6 @@ class TQRContainer(results:TupleQueryResult) extends IndexedContainer {
     bindings = results.getBindingNames
     var bNameIt = bindings.iterator
     while(bNameIt.hasNext) {
-      //addContainerProperty(PREDICATE_ID, String.class,null)
       val bName = bNameIt.next
       addContainerProperty(bName, classOf[Value],null)
       println("bName:(%s)" format bName)
@@ -107,17 +93,45 @@ class TQRContainer(results:TupleQueryResult) extends IndexedContainer {
     }
   }
 
-  /*container.sort(new Object[] { iso3166_PROPERTY_NAME },
-new boolean[] { true });
-}*/
+}
 
+class TQREditableColumnGenerator(val comboValues:JCollection[Value], clickListener:VButton.ClickListener) extends TQRColumnGenerator(clickListener) {
+
+  override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
+    val item = source.getItem(itemId)
+    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
+    val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
+    
+    val component = 
+      if(colVal != null) {
+	if(source.isEditable) {
+	  val c = DocUtils.getEditableComponent(colVal,comboValues)
+	  c match {
+	    case b:Button => b.addListener(clickListener)
+	    case _ => Unit
+	  }
+	  c
+	} else {
+	  val c = DocUtils.getComponent(colVal)
+	  c match {
+	    case b:Button => b.addListener(clickListener)
+	    case _ => Unit
+	  }
+	  c
+	}
+      } else {
+	new Label("null")
+      }
+
+    component
+  }
 }
 
 class TQRColumnGenerator(val clickListener:VButton.ClickListener) extends VTable.ColumnGenerator {
 
   override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
     val item = source.getItem(itemId)
-    println("columnId:" + columnId.toString)
+    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
     val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
     
     val component = 
@@ -136,13 +150,19 @@ class TQRColumnGenerator(val clickListener:VButton.ClickListener) extends VTable
   }
 }
 
-class TQRTable(val clickListener:VButton.ClickListener, rest:Rest,query:String) extends Table {
+class TQRTable(val columnGenerator:Map[String,TQRColumnGenerator], rest:Rest, query:String) extends Table {
 
     val results = rest.sparql(query)
 
     val container = new TQRContainer(results)
     setContainerDataSource(container)
-    TQRContainer.addGeneratedColumns(results.getBindingNames,this,clickListener)
+
+    var bNameIt = results.getBindingNames.iterator
+    while(bNameIt.hasNext) {
+      val bName = bNameIt.next
+      println("adding generated column(%s,%s)" format (bName,columnGenerator))
+      columnGenerator.get(bName).map(addGeneratedColumn(bName,_))
+    }
 }
 
 class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) extends CustomComponent {
@@ -153,8 +173,11 @@ class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) ex
 
   def getSubjectPanel():Panel = {
     val component = this
+    val colGen = new TQRColumnGenerator(clickListener)
+    val genMap = Map("s" -> colGen, "p" -> colGen, "o" -> colGen)
 
-    table = new TQRTable(clickListener,rest,"select ?s ?p ?o where { ?s ?p ?o. ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://bbp.epfl.ch/ontology/morphology#Morphology> }")
+    val query = "select ?s ?p ?o where { ?s ?p ?o. ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://bbp.epfl.ch/ontology/morphology#Morphology> }"
+    table = new TQRTable(genMap,rest,query)
 
     val panel = new Panel(caption = "SPARQL") 
 
@@ -165,8 +188,8 @@ class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) ex
 	rdf.setValue("select distinct ?s where { ?s ?p ?o }")
 	//rdf.setInputPrompt("Enter some SPARQL to run against the DB")
 	add(new HorizontalLayout() {
-	  add(new Button("Query!", action = {c => println(c); query(rdf,layout)}))
-	  add(new Button("Clear", action = _ => clear(rdf)))
+	  add(new Button("Query!", action = {c => println(c); doQuery(rdf,layout)}))
+	  add(new Button("Clear", action = _ => doClear(rdf)))
 	})
       add(table)
     }
@@ -176,9 +199,11 @@ class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) ex
   }
     
 
-  def query(rdf:TextArea,parent:ComponentContainer) = {
+  def doQuery(rdf:TextArea,parent:ComponentContainer) = {
+    val colGen = new TQRColumnGenerator(clickListener)
+    val genMap = Map("s" -> colGen, "p" -> colGen, "o" -> colGen)
     
-    val t = new TQRTable(clickListener,rest,rdf.getValue.toString)
+    val t = new TQRTable(genMap,rest,rdf.getValue.toString)
     println("wtf rdf:" + rdf.getValue.toString)
     val cIt = parent.getComponentIterator
     var done = false
@@ -200,7 +225,7 @@ class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) ex
     */
   }
 
-  def clear(rdf:TextArea) = {
+  def doClear(rdf:TextArea) = {
     rdf.setValue("")
   }
 }

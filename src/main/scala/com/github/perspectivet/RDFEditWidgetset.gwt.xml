@@ -3,5 +3,6 @@
 	
 	<!-- Add widgetset modules from add-ons here. E.g.
 	<inherits name="org.vaadin.teemu.ratingstars.gwt.RatingStarsWidgetset" />
+	<inherits name="org.vaadin.peter.contextmenu.ContextmenuWidgetset" />
 	-->
 </module>
