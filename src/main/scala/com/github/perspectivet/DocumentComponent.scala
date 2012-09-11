@@ -16,7 +16,7 @@ import com.vaadin.terminal.Sizeable
 import org.openrdf.model.{Value,Resource,URI}
 import org.openrdf.query.BindingSet
 import org.openrdf.query.TupleQueryResult
-import org.openrdf.model.impl.URIImpl
+import org.openrdf.model.impl.{URIImpl,LiteralImpl}
 
 import java.util.{LinkedList => JLinkedList,Collection => JCollection}
 import scala.collection.immutable.Map
@@ -30,23 +30,42 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
   val ACTION_NEW = new Action("New")
   val ACTION_DELETE = new Action("Delete")
   val ACTION_LOG = new Action("Log")
-  val ACTIONS = Array(ACTION_NEW,ACTION_DELETE,ACTION_LOG)
+  val ACTIONS = Array(ACTION_NEW,ACTION_DELETE/*,ACTION_LOG*/)
 
   override def getActions(target:Object, sender:Object) = ACTIONS
 
   override def handleAction(action:Action, target:Object, sender:Object) = {
+    println("Handle that action...")
     if (ACTION_NEW == action) {
-      val obj = table.addItem(Array[Object](new Button("foo"),"unset"),null)
+      println("Add...")
+      //val obj = table.addItem(Array[Object]("foo","bar"),null)
+      val itemId = table.addItemAfter(sender)
+      println("target:" + target.toString)
+      println("sender:" + sender.toString)
+      val ds = table.getContainerDataSource
+      val ids = ds.getItem(itemId).getItemPropertyIds
+      val idit = ids.iterator
+      while(idit.hasNext) {
+	val idnext = idit.next
+	println("next:" + idnext.toString + "," + ds.getItem(itemId).getItemProperty(idnext))
+	val prop = ds.getItem(itemId).getItemProperty(idnext)
+	//prop.setValue(new LiteralImpl(idnext.toString))
+	idnext.toString match {
+	  case "Property" => prop.setValue(new URIImpl("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))
+	  case "Value" => prop.setValue(new LiteralImpl("nothing"))
+	}
+      }
+      table.setEditable(true)
+      println("itemId:" + itemId.toString)
       table.refreshRowCache()
       table.requestRepaint()
     } else if (ACTION_DELETE == action) {
+      println("Delete...")
       table.removeItem(target)
       table.refreshRowCache()
       table.requestRepaint()
     } else if (ACTION_LOG == action) {
-      /*table.removeItem(target)
-      table.refreshRowCache()
-      table.requestRepaint()*/
+      println("Log...")
     } 
   }
 }
@@ -141,6 +160,7 @@ object DocUtils {
 	println("value : " + v.stringValue)
 	val te = new TextField
 	te.setValue(ResUtils.shorten(_v))
+	
 	te
       }
       case _ => {
@@ -207,35 +227,9 @@ object DocUtils {
     label
   }
 }
-/*
-class TQREditableGenerator(val clickListener:VButton.ClickListener,optionList:JCollection[Value]) extends VTable.ColumnGenerator {
 
-  override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
-    val item = source.getItem(itemId)
-    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
-    val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
-    
-    val component = 
-      if(colVal != null) {
-	val c = DocUtils.getComponent(colVal)
-	c match {
-	  case b:Button => b.addListener(clickListener)
-	  case _ => Unit
-	}
-	c
-      } else {
-	new Label("null")
-      }
-
-    component
-  }
-}
-*/
-
-class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with VButton.ClickListener {
-//class DocumentComponent(val doc:Document, val rest:Rest) extends CustomComponent {
+class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with VButton.ClickListener with Action.Handler {
   val document = this
-  //setCompositionRoot(getSubjectPanel(s))
   setCompositionRoot(getSubjectTable(s))
 
   override def buttonClick(event:VButton#ClickEvent) {
@@ -244,7 +238,7 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
 	b.getData match {
 	  case u:URI =>
 	    println("clicked button with value(%s)" format u.stringValue)
-	  //switchToDocument(u,tabs,doc)
+	    setSubjectPanel(u)
 	  case _ =>
 	    println("clicked a non-URI button")
 	}
@@ -253,6 +247,48 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
     }
   }
   
+  val ACTION_ADD = new Action("Add")
+  val ACTION_DELETE = new Action("Delete")
+
+  override def getActions(target:Object, sender:Object) = Array(ACTION_ADD,ACTION_DELETE)
+
+  override def handleAction(action:Action, sender:Object, target:Object) = {
+    if (action == ACTION_ADD) {
+      println("add...")
+      val it = document.getComponentIterator
+      while(it.hasNext) {
+	println("next:" + it.next.toString)
+      }
+/*      // Allow children for the target item, and expand it
+      tree.setChildrenAllowed(target, true)
+      tree.expandItem(target)
+
+      // Create new item, set parent, disallow children (= leaf node)
+      val itemId = tree.addItem()
+      tree.setParent(itemId, target)
+      tree.setChildrenAllowed(itemId, false)
+
+      // Set the name for this item (we use it as item caption)
+      Item item = tree.getItem(itemId)
+      Property name = item.getItemProperty(ExampleUtil.hw_PROPERTY_NAME)
+      name.setValue("New Item")*/
+
+    } else if (action == ACTION_DELETE) {
+      println("delete...")
+/*      Object parent = tree.getParent(target)
+      tree.removeItem(target)
+      // If the deleted object's parent has no more children, set it's
+      // childrenallowed property to false (= leaf node)
+      if (parent != null) {
+        Collection<?> children = tree.getChildren(parent)
+        if (children != null && children.isEmpty()) {
+          tree.setChildrenAllowed(parent, false)
+        }
+      }
+      */
+    }
+  }
+
   def getSubjectPanel(subject:URI):Panel = {
     val doc = rest.getSubjectDocument(subject,List())
 
@@ -264,32 +300,34 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
     //val objTypes = rest.bindingToCollection("o",objResults).asJavaCollection
     val objTypes = new TQRContainer(objResults)
 
-  var i = 0
-  val ilen = doc.properties.size
-  val propertyGrid = 
-    if(ilen > 0) {
-      val propIt = doc.properties.iterator
-      val grid = new GridLayout(4,ilen)
-      grid.setSpacing(true)
-      while(i < ilen) {
-	val po = propIt.next
-	val pred = DocUtils.getPredicateComponent(po.pred,this)
-	val obj = DocUtils.getSubjectComponent(po.obj,this)
-	val edit = new Button("Edit"/*, action = _ => editProperty(i,grid)*/)
-	edit.setStyleName("small")
-	val delete = new Button("-", action = _ => deleteProperty(i,grid))
-	delete.setStyleName("small")
-	grid.addComponent(edit,0,i)
-	grid.addComponent(pred,1,i)
-	grid.addComponent(obj,2,i)
-	grid.addComponent(delete,3,i)
-	i=i+1
+    var i = 0
+    val ilen = doc.properties.size
+    val propertyGrid = 
+      if(ilen > 0) {
+	val propIt = doc.properties.iterator
+	val grid = new GridLayout(4,ilen)
+	grid.setSpacing(true)
+	while(i < ilen) {
+	  val po = propIt.next
+	  val pred = DocUtils.getPredicateComponent(po.pred,this)
+	  val obj = DocUtils.getSubjectComponent(po.obj,this)
+	  val edit = new Button("Edit"/*, action = _ => editProperty(i,grid)*/)
+	  edit.setStyleName("small")
+	  val delete = new Button("-", action = _ => deleteProperty(i,grid))
+	  delete.setStyleName("small")
+	  grid.addComponent(edit,0,i)
+	  grid.addComponent(pred,1,i)
+	  grid.addComponent(obj,2,i)
+	  grid.addComponent(delete,3,i)
+	  i=i+1
+	}
+	//switchToDocument(u,tabs,document)
+	//switchToDocument(u,tabs,document)
+	grid
+      } else {
+	new GridLayout()
       }
-      grid
-    } else {
-      new GridLayout()
-    }
-
+  
     val hl = new HorizontalLayout() {
       val subject = add(new TextField)
       subject.setValue(doc.subject.stringValue)
@@ -319,12 +357,14 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
     val query = "SELECT ?Property ?Value WHERE { <%s> ?Property ?Value }" format doc.subject.stringValue
 
     val propTable = new TQRTable(genMap,rest,query)
+    //propTable.addActionHandler(new DocumentActionHandler(propTable))
     propTable.addActionHandler(new DocumentActionHandler(propTable))
-
+    propTable.setWidth(100 percent)
     val hl = new HorizontalLayout() {
       val subject = add(new TextField)
-      subject.setValue(doc.subject.stringValue)
-      subject.setWidth(doc.subject.stringValue.length, Sizeable.UNITS_EM)
+      val subjectVal = ResUtils.shorten(doc.subject)
+      subject.setValue(subjectVal)
+      subject.setWidth(subjectVal.length, Sizeable.UNITS_EM)
       val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
     }
     val panel = new Panel(caption = "Document") {

@@ -122,7 +122,7 @@ class TQREditableColumnGenerator(val comboValues:JCollection[Value], clickListen
       } else {
 	new Label("null")
       }
-
+    component.setWidth(100 percent)
     component
   }
 }
