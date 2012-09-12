@@ -32,13 +32,15 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
   val ACTION_LOG = new Action("Log")
   val ACTIONS = Array(ACTION_NEW,ACTION_DELETE/*,ACTION_LOG*/)
 
+  var d1:Document = null
+  var d2:Document = null
+
   override def getActions(target:Object, sender:Object) = ACTIONS
 
   override def handleAction(action:Action, target:Object, sender:Object) = {
     println("Handle that action...")
     if (ACTION_NEW == action) {
       println("Add...")
-      //val obj = table.addItem(Array[Object]("foo","bar"),null)
       val itemId = table.addItemAfter(sender)
       println("target:" + target.toString)
       println("sender:" + sender.toString)
@@ -49,7 +51,6 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
 	val idnext = idit.next
 	println("next:" + idnext.toString + "," + ds.getItem(itemId).getItemProperty(idnext))
 	val prop = ds.getItem(itemId).getItemProperty(idnext)
-	//prop.setValue(new LiteralImpl(idnext.toString))
 	idnext.toString match {
 	  case "Property" => prop.setValue(new URIImpl("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))
 	  case "Value" => prop.setValue(new LiteralImpl("nothing"))
@@ -72,36 +73,59 @@ class DocumentActionHandler(val table:Table) extends Action.Handler {
 
 
 object ResUtils {
-  val convertible = Map(
-    "http://www.w3.org/1999/02/22-rdf-syntax-ns" -> "rdf",
-    "http://www.w3.org/2000/01/rdf-schema" -> "rdfs",
-    "http://bbp.epfl.ch/ontology/morphology" -> "mt"
-    //"http://purl.uniprot.org/core/" -> "uniprot-core"
+  val convertible = List(
+    ("http://www.w3.org/1999/02/22-rdf-syntax-ns",("#","rdf")),
+    ("http://www.w3.org/2000/01/rdf-schema",("#","rdfs")),
+    ("http://bbp.epfl.ch/ontology/morphology",("#","mt")),
+    ("http://purl.uniprot.org/core",("/","up-core"))
   )
+
+  val prefix = convertible.map { 
+    case(long,(sep,short)) => 
+      "PREFIX " + short + ": <" + long + sep + ">"
+  }
+
+  val shortenMap = convertible.toMap
+
+  val expandMap = convertible.map{ case(long,(sep,short)) => (short,(sep,long)) }.toMap
   
   def urlreduce(url:String):String = {
     val (p,s) = urlsplit(url)
     println("p(%s),s(%s)" format (p,s))
-    convertible.get(p) match {
-      case Some(redp) => redp + ":" + s
+    shortenMap.get(p) match {
+      case Some((sep,redp)) => redp + ":" + s
       case None => url
     }
   }
 
   def urlsplit(s:String):(String,String) = {
-    val lastHash = s.lastIndexOf("#")
+    val lastHash = Math.max(s.lastIndexOf("#"),s.lastIndexOf("/"))
     if (lastHash >= 0) {
       val (pref,suff) = s.splitAt(lastHash)
-      (pref,suff.replace("#",""))
+      (pref,suff.tail)
     } else {
       ("",s)
     }
   }
 
-  def shorten(value:Value):String = { 
+  def toAbbrevString(value:Value):String = { 
     value match {
       case r:Resource => urlreduce(r.stringValue)
       case v:Value => v.stringValue
+    }
+  }
+
+  def toValue(s:String):Value = {
+    val colon = s.indexOf(':')
+    if(colon >= 0) {
+      val (prefix,suffix) = s.splitAt(s.indexOf(':'))
+      //suffix includes the ':' at the front
+      expandMap.get(prefix) match {
+	case Some((sep,long)) => new URIImpl(long + sep + suffix.tail)
+	case _ => new LiteralImpl(s)
+      }
+    } else {
+      new LiteralImpl(s)
     }
   }
 
@@ -112,7 +136,7 @@ object DocUtils {
     val label = v match {
       case u:URI => {
 	println("uri : " + v.stringValue)
-	val button = new Button(ResUtils.shorten(u), 
+	val button = new Button(ResUtils.toAbbrevString(u), 
 				action = _ => parent.setSubjectPanel(u))
 	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
@@ -120,11 +144,11 @@ object DocUtils {
       }
       case r:Resource => {
 	println("resource : " + v.stringValue)
-	new Label(ResUtils.shorten(r))
+	new Label(ResUtils.toAbbrevString(r))
       }
       case _v:Value => {
 	println("value : " + v.stringValue)
-	new Label(ResUtils.shorten(_v))
+	new Label(ResUtils.toAbbrevString(_v))
       }
       case _ => {
 	println("Any : "+v.toString)
@@ -139,10 +163,10 @@ object DocUtils {
     val label = v match {
       case u:URI => {
 	println("uri : " + v.stringValue)
-	val value = ResUtils.shorten(u)
+	val value = ResUtils.toAbbrevString(u)
 	val comboBox = new ComboBox
 	jforeach[Value](comboValues,c => 
-	  comboBox.addItem(ResUtils.shorten(c)))
+	  comboBox.addItem(ResUtils.toAbbrevString(c)))
 	comboBox.setValue(value)
 	comboBox.setTextInputAllowed(true)
 	comboBox.setFilteringMode(Filtering.FILTERINGMODE_CONTAINS)
@@ -153,13 +177,13 @@ object DocUtils {
       case r:Resource => {
 	println("resource : " + v.stringValue)
 	val te = new TextField
-	te.setValue(ResUtils.shorten(r))
+	te.setValue(ResUtils.toAbbrevString(r))
 	te
       }
       case _v:Value => {
 	println("value : " + v.stringValue)
 	val te = new TextField
-	te.setValue(ResUtils.shorten(_v))
+	te.setValue(ResUtils.toAbbrevString(_v))
 	
 	te
       }
@@ -178,18 +202,18 @@ object DocUtils {
     val label = v match {
       case u:URI => {
 	println("uri : " + v.stringValue)
-	val button = new Button(ResUtils.shorten(u))
+	val button = new Button(ResUtils.toAbbrevString(u))
 	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
 	button
       }
       case r:Resource => {
 	println("resource : " + v.stringValue)
-	new Label(ResUtils.shorten(r))
+	new Label(ResUtils.toAbbrevString(r))
       }
       case _v:Value => {
 	println("value : " + v.stringValue)
-	new Label(ResUtils.shorten(_v))
+	new Label(ResUtils.toAbbrevString(_v))
       }
       case _ => {
 	println("Any : "+v.toString)
@@ -203,7 +227,7 @@ object DocUtils {
     val label = v match {
       case u:URI => {
 	println("uri : " + v.stringValue)
-	val button = new Button(ResUtils.shorten(u), 
+	val button = new Button(ResUtils.toAbbrevString(u), 
 		   action = _ => parent.setSubjectPanel(u))
 	button.setData(u)
 	button.setStyleName(BaseTheme.BUTTON_LINK)
@@ -211,11 +235,11 @@ object DocUtils {
       }
       case r:Resource => {
 	println("resource : " + v.stringValue)
-	new Label(ResUtils.shorten(r))
+	new Label(ResUtils.toAbbrevString(r))
       }
       case _v:Value => {
 	println("value : " + v.stringValue)
-	new Label(ResUtils.shorten(_v))
+	new Label(ResUtils.toAbbrevString(_v))
       }
       case _ => {
 	println("Any : "+v.toString)
@@ -228,7 +252,7 @@ object DocUtils {
   }
 }
 
-class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with VButton.ClickListener with Action.Handler {
+class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with VButton.ClickListener {
   val document = this
   setCompositionRoot(getSubjectTable(s))
 
@@ -246,49 +270,8 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
 	println("clicked a non button")
     }
   }
-  
-  val ACTION_ADD = new Action("Add")
-  val ACTION_DELETE = new Action("Delete")
 
-  override def getActions(target:Object, sender:Object) = Array(ACTION_ADD,ACTION_DELETE)
-
-  override def handleAction(action:Action, sender:Object, target:Object) = {
-    if (action == ACTION_ADD) {
-      println("add...")
-      val it = document.getComponentIterator
-      while(it.hasNext) {
-	println("next:" + it.next.toString)
-      }
-/*      // Allow children for the target item, and expand it
-      tree.setChildrenAllowed(target, true)
-      tree.expandItem(target)
-
-      // Create new item, set parent, disallow children (= leaf node)
-      val itemId = tree.addItem()
-      tree.setParent(itemId, target)
-      tree.setChildrenAllowed(itemId, false)
-
-      // Set the name for this item (we use it as item caption)
-      Item item = tree.getItem(itemId)
-      Property name = item.getItemProperty(ExampleUtil.hw_PROPERTY_NAME)
-      name.setValue("New Item")*/
-
-    } else if (action == ACTION_DELETE) {
-      println("delete...")
-/*      Object parent = tree.getParent(target)
-      tree.removeItem(target)
-      // If the deleted object's parent has no more children, set it's
-      // childrenallowed property to false (= leaf node)
-      if (parent != null) {
-        Collection<?> children = tree.getChildren(parent)
-        if (children != null && children.isEmpty()) {
-          tree.setChildrenAllowed(parent, false)
-        }
-      }
-      */
-    }
-  }
-
+/*  
   def getSubjectPanel(subject:URI):Panel = {
     val doc = rest.getSubjectDocument(subject,List())
 
@@ -335,6 +318,7 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
       val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
     }
     val panel = new Panel(caption = "Document") {
+      ResUtils.prefix.foreach(p => add(new Label(p)))
       add(hl)
       add(propertyGrid)
       add(new Button("Add property"/*,action = _ => addProperty(propertyGrid)*/))
@@ -342,6 +326,7 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
 
     panel
   }
+*/
 
   def getSubjectTable(subject:URI):Panel = {
     val doc = rest.getSubjectDocument(subject,List())
@@ -362,19 +347,22 @@ class DocumentComponent(val s:URI, val rest:Rest) extends CustomComponent with V
     propTable.setWidth(100 percent)
     val hl = new HorizontalLayout() {
       val subject = add(new TextField)
-      val subjectVal = ResUtils.shorten(doc.subject)
+      val subjectVal = ResUtils.toAbbrevString(doc.subject)
       subject.setValue(subjectVal)
       subject.setWidth(subjectVal.length, Sizeable.UNITS_EM)
       val load = add(new Button("Load",action = _ => setSubjectPanel(new URIImpl(subject.getValue.toString))))
     }
     val panel = new Panel(caption = "Document") {
+      ResUtils.prefix.foreach(p => add(new Label(p)))
       add(hl)
       add(propTable)
-      add(new Button("Edit",
-		     action = _ => {
+      val editButton = new Button("Edit")
+      editButton.addListener(
+		   action = _ => {
 		       propTable.setEditable(!propTable.isEditable())
-		       this.setCaption((if(propTable.isEditable()) "Save" else "Edit"))
-		     }))
+		       editButton.setCaption((if(propTable.isEditable()) "Save" else "Edit"))
+		     })
+      add(editButton)
     }
 
     panel

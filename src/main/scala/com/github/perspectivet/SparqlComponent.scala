@@ -28,11 +28,6 @@ import scala.collection.JavaConverters._
 import vaadin.scala._
 
 class SListContainer(names:List[String],types:Seq[String],values:Seq[String]) extends IndexedContainer {
-  //val PREDICATE_ID = "Id"
-  //val TYPE_NAME = "Type"
-  //val VALUE_NAME = "Value"
-
-  //addContainerProperty(PREDICATE_ID, String.class,null)
   addContainerProperty(names(0), classOf[String],null)
   addContainerProperty(names(1), classOf[String],null)
 
@@ -46,11 +41,6 @@ class SListContainer(names:List[String],types:Seq[String],values:Seq[String]) ex
     item.getItemProperty(names(1)).setValue(vi.next)
     i = i+1
   }
-  
-  /*container.sort(new Object[] { iso3166_PROPERTY_NAME },
-new boolean[] { true });
-}*/
-
 }
 
 object TQRContainer {
@@ -65,7 +55,7 @@ object TQRContainer {
   }
 }
 
-class TQRContainer(results:TupleQueryResult) extends IndexedContainer {
+class TQRContainer(val results:TupleQueryResult) extends IndexedContainer {
   var bindings:JList[String] = null
 
   init(results)
@@ -152,17 +142,19 @@ class TQRColumnGenerator(val clickListener:VButton.ClickListener) extends VTable
 
 class TQRTable(val columnGenerator:Map[String,TQRColumnGenerator], rest:Rest, query:String) extends Table {
 
-    val results = rest.sparql(query)
+  val prefixedQuery = ResUtils.prefix.mkString("","\n","\n") + query
+  val results = rest.sparql(prefixedQuery)
 
-    val container = new TQRContainer(results)
-    setContainerDataSource(container)
+  val container = new TQRContainer(results)
+  setContainerDataSource(container)
 
-    var bNameIt = results.getBindingNames.iterator
-    while(bNameIt.hasNext) {
-      val bName = bNameIt.next
-      println("adding generated column(%s,%s)" format (bName,columnGenerator))
-      columnGenerator.get(bName).map(addGeneratedColumn(bName,_))
-    }
+  var bNameIt = results.getBindingNames.iterator
+  while(bNameIt.hasNext) {
+    val bName = bNameIt.next
+    println("adding generated column(%s,%s)" format (bName,columnGenerator))
+    columnGenerator.get(bName).map(addGeneratedColumn(bName,_))
+  }
+  println("prefixedQuery:\n" + prefixedQuery)
 }
 
 class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) extends CustomComponent {
@@ -176,21 +168,22 @@ class SparqlComponent(val rest:Rest, val clickListener:VButton.ClickListener) ex
     val colGen = new TQRColumnGenerator(clickListener)
     val genMap = Map("s" -> colGen, "p" -> colGen, "o" -> colGen)
 
-    val query = "select ?s ?p ?o where { ?s ?p ?o. ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://bbp.epfl.ch/ontology/morphology#Morphology> }"
+    val query = "select distinct ?s where { ?s ?p ?o }"
     table = new TQRTable(genMap,rest,query)
 
     val panel = new Panel(caption = "SPARQL") 
 
     val layout = new VerticalLayout(width = 100 percent) with FilterableComponentContainer {
-	val rdf = add(new TextArea("Query Statement"))
-	val layout = this
-	rdf.setSizeFull
-	rdf.setValue("select distinct ?s where { ?s ?p ?o }")
-	//rdf.setInputPrompt("Enter some SPARQL to run against the DB")
-	add(new HorizontalLayout() {
-	  add(new Button("Query!", action = {c => println(c); doQuery(rdf,layout)}))
-	  add(new Button("Clear", action = _ => doClear(rdf)))
-	})
+      ResUtils.prefix.foreach(p => add(new Label(p)))
+      val rdf = add(new TextArea("Query Statement"))
+      val layout = this
+      rdf.setSizeFull
+      rdf.setValue("select distinct ?s where { ?s ?p ?o }")
+      //rdf.setInputPrompt("Enter some SPARQL to run against the DB")
+      add(new HorizontalLayout() {
+	add(new Button("Query!", action = {c => println(c); doQuery(rdf,layout)}))
+	add(new Button("Clear", action = _ => doClear(rdf)))
+      })
       add(table)
     }
 
