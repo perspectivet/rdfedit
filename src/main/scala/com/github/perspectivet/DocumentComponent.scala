@@ -30,8 +30,8 @@ class DocumentActionHandler(val subject:Resource, val table:TQRTable, toggleEdit
 //class DocumentActionHandler(val table:TQRTable, setEditable:Boolean => Unit) extends Action.Handler {
   val ACTION_NEW = new Action("New")
   val ACTION_DELETE = new Action("Delete")
-  val ACTION_EDIT = new Action("Edit Table")
-  val ACTION_SAVE = new Action("Save Table")
+  val ACTION_EDIT = new Action("Edit Mode")
+  val ACTION_SAVE = new Action("View Mode")
   val ACTION_FOLLOW = new Action("Follow link")
   //TBD : val ACTION_COPY_URL = new Action("Copy")
   //TBD : val ACTION_LOG = new Action("Log")
