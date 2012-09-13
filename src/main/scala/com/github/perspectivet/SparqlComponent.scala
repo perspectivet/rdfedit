@@ -89,7 +89,7 @@ class TQREditableColumnGenerator(val comboValues:JCollection[Value], clickListen
 
   override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
     val item = source.getItem(itemId)
-    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
+    //println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
     val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
     
     val component = 
@@ -121,7 +121,7 @@ class TQRColumnGenerator(val clickListener:VButton.ClickListener) extends VTable
 
   override def generateCell(source:VTable,itemId:Object,columnId:Object):Component = {
     val item = source.getItem(itemId)
-    println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
+    //println("generating %s itemId:%s,columnId:%s" format (if(source.isEditable) "editable" else "read-only", itemId,columnId))
     val colVal = item.getItemProperty(columnId).getValue().asInstanceOf[Value]
     
     val component = 
@@ -140,7 +140,7 @@ class TQRColumnGenerator(val clickListener:VButton.ClickListener) extends VTable
   }
 }
 
-class TQRTable(val columnGenerator:Map[String,TQRColumnGenerator], rest:Rest, query:String) extends Table {
+class TQRTable(val columnGenerator:Map[String,TQRColumnGenerator], val rest:Rest, query:String) extends Table {
 
   val prefixedQuery = ResUtils.prefix.mkString("","\n","\n") + query
   val results = rest.sparql(prefixedQuery)
