@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
   "org.vaadin.addons" % "scaladin" % "1.0.0",
   "org.eclipse.jetty" % "jetty-webapp" % "8.0.4.v20111024" % "container",
   "com.github.perspectivet" %% "bigdata-rest-scala" % "0.0.1-SNAPSHOT",
-  "commons-collections" % "commons-collections" % "3.2.1"
+  "org.clapper" %% "grizzled-slf4j" % "0.6.9"
 )
 
 //other add-ons

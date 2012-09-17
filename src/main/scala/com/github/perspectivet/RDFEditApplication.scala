@@ -26,9 +26,10 @@ class RDFEditApplication extends Application with VButton.ClickListener{
 
 
     val tabs = new TabSheet(caption = "RDF Workbench",width = 100 percent, height = 100 percent) {
-      addTab(doc,"Document View")
+      addTab(doc,"Document")
       addTab(new SparqlComponent(rest, application),"Query")
-      addTab(new UploadComponent(rest),"RDF Data Upload")
+      addTab(new UploadComponent(rest),"Import")
+      addTab(new HelpComponent,"Help")
     }
 
   override def buttonClick(event:VButton#ClickEvent) {
